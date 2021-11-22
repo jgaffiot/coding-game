@@ -33,6 +33,7 @@ COLOR_REPLACEMENT = dict(
     lightwhite="white",
 )
 
+
 def look(
     desc: str = "", *, y2: bool = False
 ) -> Dict[str, Union[str, Dict[str, Union[str, int]]]]:
@@ -74,59 +75,60 @@ def look(
     kwargs = dict(mode="markers")
 
     if y2 is True:
-        kwargs['secondary_y'] = True
+        kwargs["secondary_y"] = True
 
     if not desc:
         return kwargs
 
     # noinspection RegExpAnonymousGroup
     reg_desc = re.match(
-        r'^(?P<dash>_|(--\.)|(--)|(-\.)|\.|-)?(?P<color>[a-z]+)?(?P<width>\d)?$', desc
+        r"^(?P<dash>_|(--\.)|(--)|(-\.)|\.|-)?(?P<color>[a-z]+)?(?P<width>\d)?$", desc
     )
     if not reg_desc:
         print(f"Can not match look description: {desc}")
         return kwargs
 
-    if reg_desc['dash']:
-        kwargs['mode'] = "lines"
+    if reg_desc["dash"]:
+        kwargs["mode"] = "lines"
         dash = ""
-        if '_' in reg_desc['dash']:
+        if "_" in reg_desc["dash"]:
             dash += "solid"
-        elif '--' in reg_desc['dash']:
+        elif "--" in reg_desc["dash"]:
             dash += "longdash"
-        elif '-' in reg_desc['dash']:
+        elif "-" in reg_desc["dash"]:
             dash += "dash"
-        if '.' in reg_desc['dash']:
+        if "." in reg_desc["dash"]:
             dash += "dot"
-        kwargs['line'] = dict(dash=dash)
+        kwargs["line"] = dict(dash=dash)
 
-    if reg_desc['color']:
+    if reg_desc["color"]:
         cols = "".join(COLOR_SHORT.keys())
-        reg_col = re.match(fr'^(?P<prefix>[ld])?(?P<col>[{cols}])$', reg_desc['color'])
+        reg_col = re.match(fr"^(?P<prefix>[ld])?(?P<col>[{cols}])$", reg_desc["color"])
         if reg_col:
             color = ""
-            if reg_col['prefix']:
-                color = "light" if 'l' in reg_col['prefix'] else "dark"
-            color += COLOR_SHORT[reg_col['col']]
+            if reg_col["prefix"]:
+                color = "light" if "l" in reg_col["prefix"] else "dark"
+            color += COLOR_SHORT[reg_col["col"]]
         else:
-            color = reg_desc['color']
+            color = reg_desc["color"]
         color = COLOR_REPLACEMENT.get(color, color)
-        if kwargs['mode'] == "lines":
-            kwargs.setdefault('line', {})['color'] = color
+        if kwargs["mode"] == "lines":
+            kwargs.setdefault("line", {})["color"] = color
         else:
-            kwargs.setdefault('marker', {})['color'] = color
+            kwargs.setdefault("marker", {})["color"] = color
 
-    if reg_desc['width']:
-        if kwargs['mode'] == "lines":
+    if reg_desc["width"]:
+        if kwargs["mode"] == "lines":
             # noinspection PyTypeChecker
-            kwargs.setdefault('line', {})['width'] = int(reg_desc['width'])
+            kwargs.setdefault("line", {})["width"] = int(reg_desc["width"])
         else:
             # noinspection PyTypeChecker
-            kwargs.setdefault('marker', {})['size'] = int(reg_desc['width'])
+            kwargs.setdefault("marker", {})["size"] = int(reg_desc["width"])
 
     return kwargs
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     fig = make_subplots()
     for num, point_list in PATH.items():
         x = [HOME.x]

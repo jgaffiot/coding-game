@@ -367,7 +367,7 @@ def game_loop():
             # state: For busters: 0=idle, 1=carrying a ghost.
             # value: For busters: Ghost id being carried.
             #        For ghosts: number of busters attempting to trap this ghost.
-            entity_id, x, y, entity, state, value = [int(j) for j in input().split()]
+            entity_id, x, y, entity, state, value = (int(j) for j in input().split())
             if entity == MY_ID:
                 mine_registry[entity_id].update(entity_id, x, y, state, value)
             elif entity == -1:
@@ -452,5 +452,5 @@ def game_loop():
             print(f"MOVE {X_MAX/2} {Y_MAX/2}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     game_loop()
