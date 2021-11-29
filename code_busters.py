@@ -7,6 +7,7 @@ from typing import Dict, Optional, Union
 X_MAX = 16000
 Y_MAX = 9000
 R_FOG = 2200
+R_WALL = 2000
 R_BUST_MAX = 1760
 R_BUST_MIN = 900
 R_RELEASE = 1600
@@ -95,32 +96,32 @@ SQRT2 = int(sqrt(2) / 2.0) - 1
 
 PATH = {
     0: [
-        Point(HOME.x + SIGN * R_FOG, OPP.y - SIGN * R_FOG),
-        # Point(HOME.x, OPP.y) - Point(1, -1) * (SQRT2 * R_FOG * SIGN),
-        # Point(HOME.x + SIGN * R_FOG, OPP.y - SIGN * R_FOG),
-        Point(OPP.x - SIGN * R_FOG, OPP.y - SIGN * R_FOG),
-        Point(OPP.x - SIGN * R_FOG, OPP.y - SIGN * 3.0 * R_FOG),
-        Point(HOME.x + SIGN * R_FOG, OPP.y - SIGN * 3.0 * R_FOG),
+        Point(HOME.x + SIGN * R_WALL, OPP.y - SIGN * R_WALL),
+        Point(HOME.x, OPP.y) - Point(1, -1) * (SQRT2 * R_WALL * SIGN),
+        Point(HOME.x + SIGN * R_WALL, OPP.y - SIGN * R_WALL),
+        Point(OPP.x - SIGN * R_WALL, OPP.y - SIGN * R_WALL),
+        Point(OPP.x - SIGN * R_WALL, OPP.y - SIGN * 3.0 * R_WALL),
+        Point(HOME.x + SIGN * R_WALL, OPP.y - SIGN * 3.0 * R_WALL),
     ],
     1: [
-        Point(OPP.x - SIGN * R_FOG, HOME.y + SIGN * R_FOG),
-        # Point(OPP.x, HOME.y) - Point(-1, 1) * (SQRT2 * R_FOG * SIGN),
-        # Point(OPP.x - SIGN * R_FOG, HOME.y + SIGN * R_FOG),
-        Point(OPP.x - SIGN * R_FOG, HOME.y + SIGN * 3.0 * R_FOG),
-        Point(HOME.x + SIGN * 2.0 * R_FOG, HOME.y + SIGN * 3.0 * R_FOG),
-        Point(HOME.x + SIGN * 2.0 * R_FOG, HOME.y + SIGN * R_FOG),
+        Point(OPP.x - SIGN * R_WALL, HOME.y + SIGN * R_WALL),
+        Point(OPP.x, HOME.y) - Point(-1, 1) * (SQRT2 * R_WALL * SIGN),
+        Point(OPP.x - SIGN * R_WALL, HOME.y + SIGN * R_WALL),
+        Point(OPP.x - SIGN * R_WALL, HOME.y + SIGN * 3.0 * R_WALL),
+        Point(HOME.x + SIGN * 2.0 * R_WALL, HOME.y + SIGN * 3.0 * R_WALL),
+        Point(HOME.x + SIGN * 2.0 * R_WALL, HOME.y + SIGN * R_WALL),
     ],
     2: [
         Point(HOME.x + SIGN * Y_MAX / 2.0, HOME.y + SIGN * Y_MAX / 2.0),
-        Point(OPP.x - SIGN * R_FOG / 2.0, HOME.y + SIGN * Y_MAX / 2.0),
+        Point(OPP.x - SIGN * R_WALL / 2.0, HOME.y + SIGN * Y_MAX / 2.0),
     ],
     3: [
-        Point(OPP.x - SIGN * R_FOG, OPP.y - SIGN * R_FOG),
-        Point(HOME.x + SIGN * R_FOG, HOME.y + SIGN * R_FOG),
+        Point(OPP.x - SIGN * R_WALL, OPP.y - SIGN * R_WALL),
+        Point(HOME.x + SIGN * R_WALL, HOME.y + SIGN * R_WALL),
     ],
     4: [
-        Point(OPP.x - SIGN * R_FOG, OPP.y - SIGN * R_FOG),
-        Point(HOME.x + SIGN * R_FOG, HOME.y + SIGN * R_FOG),
+        Point(OPP.x - SIGN * R_WALL, OPP.y - SIGN * R_WALL),
+        Point(HOME.x + SIGN * R_WALL, HOME.y + SIGN * R_WALL),
     ],
 }
 
@@ -366,7 +367,7 @@ def game_loop():
         visible_ghosts = {}
         for opponent in opponent_registry.values():
             opponent.is_visible = False
-            if opponent.last_stunned > turn_index + STUNNED_COOL_DOWN:
+            if opponent.last_stunned + STUNNED_COOL_DOWN <= turn_index:
                 opponent.is_stunned = False
 
         for i in range(entities):
@@ -404,9 +405,10 @@ def game_loop():
             k: v for k, v in ghost_registry.items() if k not in visible_ghosts
         }
         ghost_registry.update(visible_ghosts)
-        debug(", ".join([str(i) for i in visible_ghosts.keys()]))
-        debug(", ".join([str(i) for i in ghost_registry.keys()]))
+        debug("visible_ghosts: " + (", ".join([str(i) for i in visible_ghosts.keys()])))
+        debug("ghost_registry: " + (", ".join([str(i) for i in ghost_registry.keys()])))
 
+        # My buster's actions
         for id_, buster in mine_registry.items():
             buster: Mine
             # Try to stun
@@ -414,6 +416,7 @@ def game_loop():
                 buster.compute_dist_to_opponents(opponent_registry)
                 target_id = buster.can_stun()
                 if target_id is not None:
+                    debug(f"{id_} stun")
                     print(f"STUN {target_id}")
                     buster.last_stun = turn_index
                     opponent_registry[target_id].stunned_at(turn_index)
@@ -421,6 +424,7 @@ def game_loop():
 
             # Go back home if loaded
             if buster.loaded:
+                debug(f"{id_} loaded")
                 if buster.dist_to(HOME) <= R_RELEASE:
                     print("RELEASE")
                     continue
@@ -455,6 +459,7 @@ def game_loop():
 
             target_id = buster.can_bust()
             if target_id is not None:
+                debug(f"{id_} bust")
                 print(f"BUST {target_id}")
                 ghost_registry[target_id].pv -= 1
                 continue
