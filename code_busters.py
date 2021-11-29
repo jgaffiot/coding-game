@@ -1,7 +1,6 @@
 """CodingGames challenge: Code Busters."""
 
 import sys
-from copy import deepcopy
 from math import pi, sqrt, atan2, cos, sin
 from typing import Dict, Optional, Union
 
@@ -92,20 +91,21 @@ def distance(a: Point, b: Point) -> float:
 BASES = {0: Point(0, 0), 1: Point(16000, 9000)}
 HOME: Point = BASES[MY_ID]
 OPP: Point = BASES[(MY_ID + 1) % 2]
+SQRT2 = int(sqrt(2) / 2.0) - 1
 
 PATH = {
     0: [
         Point(HOME.x + SIGN * R_FOG, OPP.y - SIGN * R_FOG),
-        Point(HOME.x, OPP.y) + Point(1, -1) * (sqrt(2) / 2.0 * R_FOG * SIGN),
-        Point(HOME.x + SIGN * R_FOG, OPP.y - SIGN * R_FOG),
+        # Point(HOME.x, OPP.y) - Point(1, -1) * (SQRT2 * R_FOG * SIGN),
+        # Point(HOME.x + SIGN * R_FOG, OPP.y - SIGN * R_FOG),
         Point(OPP.x - SIGN * R_FOG, OPP.y - SIGN * R_FOG),
         Point(OPP.x - SIGN * R_FOG, OPP.y - SIGN * 3.0 * R_FOG),
         Point(HOME.x + SIGN * R_FOG, OPP.y - SIGN * 3.0 * R_FOG),
     ],
     1: [
         Point(OPP.x - SIGN * R_FOG, HOME.y + SIGN * R_FOG),
-        Point(OPP.x, HOME.y) + Point(-1, 1) * (sqrt(2) / 2.0 * R_FOG * SIGN),
-        Point(OPP.x - SIGN * R_FOG, HOME.y + SIGN * R_FOG),
+        # Point(OPP.x, HOME.y) - Point(-1, 1) * (SQRT2 * R_FOG * SIGN),
+        # Point(OPP.x - SIGN * R_FOG, HOME.y + SIGN * R_FOG),
         Point(OPP.x - SIGN * R_FOG, HOME.y + SIGN * 3.0 * R_FOG),
         Point(HOME.x + SIGN * 2.0 * R_FOG, HOME.y + SIGN * 3.0 * R_FOG),
         Point(HOME.x + SIGN * 2.0 * R_FOG, HOME.y + SIGN * R_FOG),
@@ -155,19 +155,21 @@ class Ghost(_Entity):
     def __init__(self):
         """Initialize self."""
         super().__init__()
+        self.pv: int = -1
         self.nb_buster: int = -1
 
     @classmethod
-    def from_full_data(cls, id_: int, x: int, y: int, nb_bust: int) -> "Ghost":
+    def from_data(cls, id_: int, x: int, y: int, pv: int, nb_bust: int) -> "Ghost":
         """Return a new Ghost fully initialized with the given data."""
         new_ghost = cls()
-        new_ghost.update(id_, x, y, nb_bust)
+        new_ghost.update(id_, x, y, pv, nb_bust)
         return new_ghost
 
     # noinspection PyMethodOverriding
-    def update(self, id_: int, x: int, y: int, nb_buster: int) -> None:
+    def update(self, id_: int, x: int, y: int, pv: int, nb_buster: int) -> None:
         """Update the current entity with new data."""
         super().update(id_, x, y)
+        self.pv = pv
         self.nb_buster = nb_buster
 
     def __repr__(self):
@@ -182,16 +184,15 @@ class TargetGhost(Ghost):
 
     def __init__(self, ghost: Ghost, buster_pos: Point):
         super().__init__()
-        self.update(ghost.id, ghost.p.x, ghost.p.y, ghost.nb_buster)
+        self.update(ghost.id, ghost.p.x, ghost.p.y, ghost.pv, ghost.nb_buster)
         self.d = buster_pos.dist_to(ghost.p)
 
 
 class _Buster(_Entity):
     """A buster, mine or opponent."""
 
-    def __init__(self, num: int):
+    def __init__(self):
         super().__init__()
-        self.num = num
         self.loaded: bool = False
         self.carried_ghost_id: int = 0
 
@@ -199,7 +200,7 @@ class _Buster(_Entity):
     def update(self, id_: int, x: int, y: int, loaded: int, ghost_id: int) -> None:
         """Update the current buster with new data."""
         super().update(id_, x, y)
-        self.loaded: bool = bool(loaded)
+        self.loaded: bool = loaded == 1
         self.carried_ghost_id: int = ghost_id
 
     def __repr__(self) -> str:
@@ -215,9 +216,9 @@ class _Buster(_Entity):
 class Opponent(_Buster):
     """One of the opponent busters."""
 
-    def __init__(self, num: int):
+    def __init__(self):
         """Initialize self."""
-        super().__init__(num)
+        super().__init__()
         self.is_stunned = False
         self.is_visible = False
         self.last_stunned: int = -100
@@ -237,7 +238,7 @@ class TargetOpp(Opponent):
     """A targeted opponent buster."""
 
     def __init__(self, opp: Opponent, buster_pos: Point):
-        super().__init__(opp.num)
+        super().__init__()
         self.update(opp.id, opp.p.x, opp.p.y, opp.loaded, opp.carried_ghost_id)
         self.is_stunned = opp.is_stunned
         self.d = buster_pos.dist_to(opp.p)
@@ -246,10 +247,14 @@ class TargetOpp(Opponent):
 class Mine(_Buster):
     """One of my busters."""
 
-    def __init__(self, num: int):
+    _current_number = 0
+
+    def __init__(self):
         """Initialize self."""
-        super().__init__(num)
-        self._last_stun: int = -100
+        super().__init__()
+        self.num = Mine._current_number
+        Mine._current_number += 1
+        self.last_stun: int = -100
         self._point_index: int = 0
         self.targets: Dict[int, TargetGhost] = {}
         self.opponents: Dict[int, TargetOpp] = {}
@@ -269,14 +274,17 @@ class Mine(_Buster):
 
     def compute_dist_to_ghost(self, ghosts: Dict[int, Ghost]) -> None:
         """Compute the distance to the given ghosts."""
-        for id_, ghost in ghosts.items():
-            self.targets[id_] = TargetGhost(ghost, self.p)
+        self.targets = {
+            id_: TargetGhost(ghost, self.p) for id_, ghost in ghosts.items()
+        }
 
     def compute_dist_to_opponents(self, opponents: Dict[int, Opponent]) -> None:
         """Compute the distance to the given ghosts."""
-        for id_, opp in opponents.items():
-            if opp.is_visible:
-                self.opponents[id_] = TargetOpp(opp, self.p)
+        self.opponents = {
+            id_: TargetOpp(opp, self.p)
+            for id_, opp in opponents.items()
+            if opp.is_visible
+        }
 
     def can_bust(self) -> Optional[int]:
         """Return the id of a ghost if it can be busted, else None."""
@@ -315,8 +323,9 @@ class Mine(_Buster):
 
     def get_closest_target(self) -> Optional[TargetGhost]:
         """Get the closest target if any."""
-        if self.targets:
-            return sorted(list(self.targets.values()), key=lambda t: t.d)[0]
+        targets = [t for t in self.targets.values() if t.pv]
+        if targets:
+            return sorted(targets, key=lambda t: t.d)[0]
         return None
 
     def explore(self) -> Point:
@@ -345,8 +354,8 @@ def game_loop():
     """The game loop."""
 
     ghost_registry: Dict[int, Ghost] = {}
-    mine_registry: Dict[int, Mine] = {i: Mine(i) for i in range(NB_BUSTERS)}
-    opponent_registry: Dict[int, Opponent] = {i: Opponent(i) for i in range(NB_BUSTERS)}
+    mine_registry: Dict[int, Mine] = {}
+    opponent_registry: Dict[int, Opponent] = {}
 
     turn_index = 0
     while True:
@@ -365,39 +374,43 @@ def game_loop():
             # y: position of this buster / ghost
             # entity: the team id if it is a buster, -1 if it is a ghost.
             # state: For busters: 0=idle, 1=carrying a ghost.
+            #        For ghosts: point of life
             # value: For busters: Ghost id being carried.
             #        For ghosts: number of busters attempting to trap this ghost.
             entity_id, x, y, entity, state, value = (int(j) for j in input().split())
             if entity == MY_ID:
-                mine_registry[entity_id].update(entity_id, x, y, state, value)
+                mine_registry.setdefault(entity_id, Mine()).update(
+                    entity_id, x, y, state, value
+                )
             elif entity == -1:
-                visible_ghosts[entity_id] = Ghost.from_full_data(entity_id, x, y, value)
+                visible_ghosts[entity_id] = Ghost.from_data(
+                    entity_id, x, y, state, value
+                )
             else:
-                opponent_registry[entity_id].update(entity_id, x, y, state, value)
+                opponent_registry.setdefault(entity_id, Opponent()).update(
+                    entity_id, x, y, state, value
+                )
 
-        # Clean the ghost registry from ghost at sight distance
-        for buster in mine_registry.values():
-            for ghost in list(ghost_registry.values()):
-                if buster.dist_to(ghost.p) <= R_FOG:
-                    del ghost_registry[ghost.id]
+        for mine in mine_registry.values():
+            if mine.loaded and mine.carried_ghost_id in ghost_registry:
+                del ghost_registry[mine.carried_ghost_id]
+
+        for opp in opponent_registry.values():
+            if opp.loaded and opp.carried_ghost_id in ghost_registry:
+                del ghost_registry[opp.carried_ghost_id]
 
         # Merge the visible ghosts into the registry
-        invisible_ghosts = deepcopy(ghost_registry)
+        invisible_ghosts = {
+            k: v for k, v in ghost_registry.items() if k not in visible_ghosts
+        }
         ghost_registry.update(visible_ghosts)
+        debug(", ".join([str(i) for i in visible_ghosts.keys()]))
+        debug(", ".join([str(i) for i in ghost_registry.keys()]))
 
         for id_, buster in mine_registry.items():
-            if buster.loaded:
-                if buster.dist_to(HOME) <= R_RELEASE:
-                    print("RELEASE")
-                    continue
-                print(f"MOVE {HOME.x} {HOME.y}")
-                continue
-
-            if not NB_GHOSTS:
-                print(f"MOVE {HOME.x} {HOME.y}")
-
+            buster: Mine
             # Try to stun
-            if turn_index - buster.last_stun > STUN_GUN_COOL_DOWN:
+            if turn_index - buster.last_stun >= STUN_GUN_COOL_DOWN:
                 buster.compute_dist_to_opponents(opponent_registry)
                 target_id = buster.can_stun()
                 if target_id is not None:
@@ -406,44 +419,56 @@ def game_loop():
                     opponent_registry[target_id].stunned_at(turn_index)
                     continue
 
+            # Go back home if loaded
+            if buster.loaded:
+                if buster.dist_to(HOME) <= R_RELEASE:
+                    print("RELEASE")
+                    continue
+                print(f"MOVE {HOME.x} {HOME.y}")
+                continue
+
+            if not NB_GHOSTS:
+                print(f"MOVE {OPP.x} {OPP.y}")
+
             # No visible nor invisible ghosts, so exploring
-            if not visible_ghosts and not invisible_ghosts:
+            if not [g for g in visible_ghosts.values() if g.pv] and not [
+                g for g in invisible_ghosts.values() if g.pv
+            ]:
                 p = buster.explore()
                 print(f"MOVE {p.x} {p.y}")
                 continue
 
             # No visible but invisible ghosts
             buster.is_exploring = False
-            if not visible_ghosts:
+            if not [g for g in visible_ghosts.values() if g.pv]:
                 buster.compute_dist_to_ghost(invisible_ghosts)
                 target = buster.get_closest_target()
-                del invisible_ghosts[target.id]
+                ghost_registry[target.id].pv -= 1
                 debug(f"{buster.num} targets INvisible {target.id}")
                 print(f"MOVE {target.p.x} {target.p.y}")
                 continue
 
             # Visible ghosts
             buster.compute_dist_to_ghost(visible_ghosts)
-            for target_id, t in buster.targets.items():
-                debug(f"{target_id} -> {t.d}")
+            # for target_id, t in buster.targets.items():
+            #     debug(f"{target_id} -> {t.d}")
 
             target_id = buster.can_bust()
             if target_id is not None:
                 print(f"BUST {target_id}")
-                del visible_ghosts[target_id]
-                del ghost_registry[target_id]
+                ghost_registry[target_id].pv -= 1
                 continue
 
             target_id = buster.has_too_close_target()
             if target_id is not None:
                 p = buster.compute_bust_point(target_id)
                 print(f"MOVE {p.x} {p.y}")
-                del visible_ghosts[target_id]
+                ghost_registry[target_id].pv -= 1
                 continue
 
             target = buster.get_closest_target()
             if target is not None:
-                del visible_ghosts[target.id]
+                ghost_registry[target.id].pv -= 1
                 debug(f"{buster.num} targets visible {target.id}")
                 print(f"MOVE {target.p.x} {target.p.y}")
                 continue
