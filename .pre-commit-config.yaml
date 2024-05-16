@@ -1,0 +1,90 @@
+---
+# exclude:
+fail_fast: true
+minimum_pre_commit_version: 1.15.0
+
+repos:
+# Python
+  - repo: local
+    hooks:
+      - id: black
+        name: Black
+        entry: black
+        language: system
+        types: [python]
+
+      - id: flake8
+        name: Flake8
+        entry: flake8
+        language: system
+        types: [python]
+
+      - id: pyupgrade
+        name: PyUpgrade
+        entry: pyupgrade
+        language: system
+        types: [python]
+        args: [--py38-plus]
+
+# Markdown
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.28.1
+    hooks:
+      - id: markdownlint
+        types: [markdown]
+
+# YAML
+  - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
+    rev: 0.1.0
+    hooks:
+      - id: yamlfmt
+        args: [--mapping, '2', --sequence, '4', --offset, '2', --width, '150']
+        types: [yaml]
+
+# All files + miscellanous
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.0.1
+    hooks:
+      - id: check-added-large-files
+      - id: forbid-new-submodules
+      - id: no-commit-to-branch
+        args: [--branch, master]
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        types: [text]
+      - id: fix-byte-order-marker
+        types: [text]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        types: [text]
+      - id: check-merge-conflict
+        types: [text]
+      - id: detect-private-key
+        types: [text]
+      - id: check-executables-have-shebangs
+        types: [text, executable]
+      - id: check-shebang-scripts-are-executable
+        types: [text]
+      - id: check-json
+        types: [json]
+      - id: pretty-format-json
+        types: [json]
+      - id: check-symlinks
+        types: [symlink]
+      - id: destroyed-symlinks
+      - id: check-toml
+        types: [toml]
+      - id: check-yaml
+        types: [yaml]
+      - id: name-tests-test
+        args: [--django]
+        files: (^|/)tests/.+\.py$
+      - id: check-ast
+        types: [python]
+      - id: check-builtin-literals
+        types: [python]
+      - id: check-docstring-first
+        types: [python]
+      - id: debug-statements
+        types: [python]
+      - id: requirements-txt-fixer
