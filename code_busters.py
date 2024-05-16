@@ -92,7 +92,7 @@ def distance(a: Point, b: Point) -> float:
 BASES = {0: Point(0, 0), 1: Point(16000, 9000)}
 HOME: Point = BASES[MY_ID]
 OPP: Point = BASES[(MY_ID + 1) % 2]
-SQRT2 = int(sqrt(2) / 2.0) - 1
+SQRT2 = sqrt(2) / 2.0
 
 PATH = {
     0: [
@@ -174,10 +174,10 @@ class Ghost(_Entity):
         self.nb_buster = nb_buster
 
     def __repr__(self):
-        return f"Ghost({self.id}, {self.p.x}, {self.p.y})"
+        return f"Ghost({self.id}, {self.p.x}, {self.p.y}, {self.pv}, {self.nb_buster})"
 
     def __str__(self):
-        return f"Ghost {self.id}, {self.p}, nb={self.nb_buster}"
+        return f"Ghost {self.id}, {self.p}, pv={self.pv}, nb={self.nb_buster}"
 
 
 class TargetGhost(Ghost):
@@ -289,10 +289,14 @@ class Mine(_Buster):
 
     def can_bust(self) -> Optional[int]:
         """Return the id of a ghost if it can be busted, else None."""
-        for id_, target in self.targets.items():
-            if R_BUST_MIN <= target.d <= R_BUST_MAX:
-                return id_
-        return None
+        bustable = [
+            ghost
+            for ghost in self.targets.values()
+            if R_BUST_MIN <= ghost.d <= R_BUST_MAX
+        ]
+        if not bustable:
+            return None
+        return sorted(bustable, key=lambda g: g.pv)[0].id
 
     def can_stun(self) -> Optional[int]:
         """Return the id of an opponent if it can be stun, else None."""
@@ -324,7 +328,7 @@ class Mine(_Buster):
 
     def get_closest_target(self) -> Optional[TargetGhost]:
         """Get the closest target if any."""
-        targets = [t for t in self.targets.values() if t.pv]
+        targets = [t for t in self.targets.values() if t.pv >= 0]
         if targets:
             return sorted(targets, key=lambda t: t.d)[0]
         return None
@@ -405,8 +409,8 @@ def game_loop():
             k: v for k, v in ghost_registry.items() if k not in visible_ghosts
         }
         ghost_registry.update(visible_ghosts)
-        debug("visible_ghosts: " + (", ".join([str(i) for i in visible_ghosts.keys()])))
-        debug("ghost_registry: " + (", ".join([str(i) for i in ghost_registry.keys()])))
+        debug("visible_ghosts: " + (", ".join(str(i) for i in visible_ghosts.values())))
+        debug("ghost_registry: " + (", ".join(str(i) for i in ghost_registry.values())))
 
         # My buster's actions
         for id_, buster in mine_registry.items():
@@ -435,8 +439,8 @@ def game_loop():
                 print(f"MOVE {OPP.x} {OPP.y}")
 
             # No visible nor invisible ghosts, so exploring
-            if not [g for g in visible_ghosts.values() if g.pv] and not [
-                g for g in invisible_ghosts.values() if g.pv
+            if not [g for g in visible_ghosts.values() if g.pv >= 0] and not [
+                g for g in invisible_ghosts.values() if g.pv >= 0
             ]:
                 p = buster.explore()
                 print(f"MOVE {p.x} {p.y}")
@@ -444,7 +448,7 @@ def game_loop():
 
             # No visible but invisible ghosts
             buster.is_exploring = False
-            if not [g for g in visible_ghosts.values() if g.pv]:
+            if not [g for g in visible_ghosts.values() if g.pv >= 0]:
                 buster.compute_dist_to_ghost(invisible_ghosts)
                 target = buster.get_closest_target()
                 ghost_registry[target.id].pv -= 1
